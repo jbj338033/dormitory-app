@@ -17,10 +17,10 @@ jobs:
         include:
           - os: windows-latest
             name: windows
-            executable: 상벌점관리.exe
+            executable: dormitory-manager.exe
           - os: macos-latest
             name: macos
-            executable: 상벌점관리.app
+            executable: dormitory-manager.app
 
     steps:
     - uses: actions/checkout@v4
@@ -38,28 +38,28 @@ jobs:
     - name: Build executable (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        pyinstaller --onefile --windowed --name="상벌점관리" main.py
+        pyinstaller --onefile --windowed --name="dormitory-manager" main.py
 
     - name: Build executable (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        pyinstaller --onedir --windowed --name="상벌점관리" main.py
+        pyinstaller --onedir --windowed --name="dormitory-manager" main.py
 
     - name: Create archive (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        Compress-Archive -Path "dist/상벌점관리.exe" -DestinationPath "상벌점관리-windows.zip"
+        Compress-Archive -Path "dist/dormitory-manager.exe" -DestinationPath "dormitory-manager-windows.zip"
 
     - name: Create archive (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        cd dist && zip -r ../상벌점관리-macos.zip 상벌점관리.app
+        cd dist && zip -r ../dormitory-manager-macos.zip dormitory-manager.app
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.name }}
-        path: 상벌점관리-${{ matrix.name }}.zip
+        path: dormitory-manager-${{ matrix.name }}.zip
 
   release:
     needs: build
@@ -81,19 +81,19 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          상벌점관리-windows.zip
-          상벌점관리-macos.zip
+          dormitory-manager-windows.zip
+          dormitory-manager-macos.zip
         tag_name: ${{ github.ref_name }}
-        name: 상벌점관리 ${{ github.ref_name }}
+        name: Dormitory Manager ${{ github.ref_name }}
         body: |
-          ## 다운로드
-          - Windows: 상벌점관리-windows.zip
-          - macOS: 상벌점관리-macos.zip
+          ## Download
+          - Windows: dormitory-manager-windows.zip
+          - macOS: dormitory-manager-macos.zip
           
-          ## 설치 방법
-          1. 해당 운영체제용 파일 다운로드
-          2. 압축 해제 후 실행
-          3. 기본 비밀번호: admin123
+          ## Installation
+          1. Download the file for your operating system
+          2. Extract and run
+          3. Default password: admin123
         draft: false
         prerelease: false
       env:
