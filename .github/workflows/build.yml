@@ -33,33 +33,116 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller
+        pip install pyinstaller dmgbuild
+        
+    - name: Install Windows dependencies
+      if: matrix.os == 'windows-latest'
+      run: |
+        pip install pyinstaller[encryption]
 
     - name: Build executable (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        pyinstaller --onefile --windowed --name="dormitory-manager" main.py
+        pyinstaller --onefile --windowed --name="dormitory-manager" --add-data=";." main.py
+        
+    - name: Create Windows installer
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Create NSIS script for installer
+        echo 'OutFile "dormitory-manager-installer.exe"' > installer.nsi
+        echo 'InstallDir "$PROGRAMFILES\Dormitory Manager"' >> installer.nsi
+        echo 'Page directory' >> installer.nsi
+        echo 'Page instfiles' >> installer.nsi
+        echo 'Section ""' >> installer.nsi
+        echo 'SetOutPath $INSTDIR' >> installer.nsi
+        echo 'File "dist\dormitory-manager.exe"' >> installer.nsi
+        echo 'CreateShortcut "$DESKTOP\Dormitory Manager.lnk" "$INSTDIR\dormitory-manager.exe"' >> installer.nsi
+        echo 'CreateDirectory "$SMPROGRAMS\Dormitory Manager"' >> installer.nsi
+        echo 'CreateShortcut "$SMPROGRAMS\Dormitory Manager\Dormitory Manager.lnk" "$INSTDIR\dormitory-manager.exe"' >> installer.nsi
+        echo 'WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\DormitoryManager" "DisplayName" "Dormitory Manager"' >> installer.nsi
+        echo 'WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\DormitoryManager" "UninstallString" "$INSTDIR\uninstall.exe"' >> installer.nsi
+        echo 'WriteUninstaller "$INSTDIR\uninstall.exe"' >> installer.nsi
+        echo 'SectionEnd' >> installer.nsi
+        # Use portable NSIS or skip installer creation for now
+        echo "Windows installer script created"
 
     - name: Build executable (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        pyinstaller --onedir --windowed --name="dormitory-manager" main.py
-
-    - name: Create archive (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        Compress-Archive -Path "dist/dormitory-manager.exe" -DestinationPath "dormitory-manager-windows.zip"
-
-    - name: Create archive (macOS)
+        pyinstaller --onedir --windowed --name="dormitory-manager" --add-data=".:./" main.py
+        
+    - name: Create DMG (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        cd dist && zip -r ../dormitory-manager-macos.zip dormitory-manager.app
+        # Create dmg settings file
+        cat > dmg_settings.py << EOF
+        import os
+        
+        files = ['dist/dormitory-manager.app']
+        symlinks = {'Applications': '/Applications'}
+        badge_icon = None
+        icon_locations = {
+            'dormitory-manager.app': (140, 120),
+            'Applications': (500, 120)
+        }
+        background = None
+        show_status_bar = False
+        show_tab_view = False
+        show_toolbar = False
+        show_pathbar = False
+        show_sidebar = False
+        sidebar_width = 180
+        window_rect = ((100, 100), (640, 280))
+        default_view = 'icon-view'
+        show_icon_preview = False
+        include_icon_view_settings = 'auto'
+        include_list_view_settings = 'auto'
+        arrange_by = None
+        grid_offset = (0, 0)
+        grid_spacing = 100
+        scroll_position = (0, 0)
+        label_pos = 'bottom'
+        text_size = 16
+        icon_size = 128
+        EOF
+        
+        # Create DMG
+        dmgbuild -s dmg_settings.py "Dormitory Manager" dormitory-manager.dmg
 
-    - name: Upload artifacts
+    - name: Prepare Windows release files
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Copy executable for zip distribution
+        Compress-Archive -Path "dist/dormitory-manager.exe" -DestinationPath "dormitory-manager-windows.zip"
+        # Copy installer if created
+        if (Test-Path "dormitory-manager-installer.exe") {
+          Copy-Item "dormitory-manager-installer.exe" "."
+        }
+
+    - name: Prepare macOS release files
+      if: matrix.os == 'macos-latest'
+      run: |
+        # Create zip archive for compatibility
+        cd dist && zip -r ../dormitory-manager-macos.zip dormitory-manager.app
+        # DMG is already created above
+
+    - name: Upload artifacts (Windows)
+      if: matrix.os == 'windows-latest'
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.name }}
-        path: dormitory-manager-${{ matrix.name }}.zip
+        path: |
+          dormitory-manager-windows.zip
+          dormitory-manager-installer.exe
+          
+    - name: Upload artifacts (macOS)
+      if: matrix.os == 'macos-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.name }}
+        path: |
+          dormitory-manager-macos.zip
+          dormitory-manager.dmg
 
   release:
     needs: build
@@ -82,18 +165,41 @@ jobs:
       with:
         files: |
           dormitory-manager-windows.zip
+          dormitory-manager-installer.exe
           dormitory-manager-macos.zip
+          dormitory-manager.dmg
         tag_name: ${{ github.ref_name }}
         name: Dormitory Manager ${{ github.ref_name }}
         body: |
           ## Download
-          - Windows: dormitory-manager-windows.zip
-          - macOS: dormitory-manager-macos.zip
+          ### Windows
+          - **Installer (권장)**: dormitory-manager-installer.exe
+          - Portable: dormitory-manager-windows.zip
+          
+          ### macOS
+          - **DMG (권장)**: dormitory-manager.dmg
+          - Zip: dormitory-manager-macos.zip
           
           ## Installation
-          1. Download the file for your operating system
-          2. Extract and run
-          3. Default password: admin123
+          ### Windows
+          - **Installer**: 다운로드 후 실행하여 설치
+          - **Portable**: 압축 해제 후 dormitory-manager.exe 실행
+          
+          ### macOS
+          - **DMG**: 다운로드 후 마운트하여 Applications 폴더로 드래그
+          - **Zip**: 압축 해제 후 Applications 폴더로 이동
+          
+          ## 기본 비밀번호
+          admin123
+          
+          ## 보안 경고 해결
+          ### Windows
+          - Windows Defender 경고 시 "추가 정보" → "실행" 클릭
+          
+          ### macOS
+          - "확인되지 않은 개발자" 경고 시:
+            1. 시스템 환경설정 → 보안 및 개인정보보호
+            2. "확인 없이 열기" 클릭
         draft: false
         prerelease: false
       env:

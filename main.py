@@ -5,32 +5,56 @@ from datetime import datetime
 import json
 import os
 import shutil
+import sys
+from pathlib import Path
 
 class App:
     def __init__(self):
+        self.data_dir = self.get_data_directory()
         self.config = self.load_config()
         self.password = self.config.get('password', 'admin123')
         self.init_db()
         self.login()
+    
+    def get_data_directory(self):
+        """사용자별 데이터 디렉토리 생성 및 반환"""
+        if sys.platform == "win32":
+            data_dir = Path(os.environ.get('APPDATA', '')) / 'DormitoryManager'
+        elif sys.platform == "darwin":
+            data_dir = Path.home() / 'Library' / 'Application Support' / 'DormitoryManager'
+        else:
+            data_dir = Path.home() / '.dormitory-manager'
+        
+        try:
+            data_dir.mkdir(parents=True, exist_ok=True)
+            return data_dir
+        except Exception:
+            # 폴백: 현재 디렉토리의 data 폴더 사용
+            fallback_dir = Path.cwd() / 'data'
+            fallback_dir.mkdir(exist_ok=True)
+            return fallback_dir
 
     def load_config(self):
+        config_path = self.data_dir / 'config.json'
         try:
-            if os.path.exists('config.json'):
-                with open('config.json', 'r', encoding='utf-8') as f:
+            if config_path.exists():
+                with open(config_path, 'r', encoding='utf-8') as f:
                     return json.load(f)
         except:
             pass
         return {}
 
     def save_config(self):
+        config_path = self.data_dir / 'config.json'
         try:
-            with open('config.json', 'w', encoding='utf-8') as f:
+            with open(config_path, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, ensure_ascii=False, indent=2)
         except:
             pass
 
     def init_db(self):
-        self.conn = sqlite3.connect('data.db')
+        db_path = self.data_dir / 'data.db'
+        self.conn = sqlite3.connect(str(db_path))
         self.cursor = self.conn.cursor()
         
         # 기존 테이블 구조 확인
@@ -255,11 +279,13 @@ class App:
 
     def backup_data(self):
         try:
-            os.makedirs('backups', exist_ok=True)
+            backup_dir = self.data_dir / 'backups'
+            backup_dir.mkdir(exist_ok=True)
             backup_name = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-            backup_path = os.path.join('backups', backup_name)
-            shutil.copy2('data.db', backup_path)
-            return backup_path
+            backup_path = backup_dir / backup_name
+            db_path = self.data_dir / 'data.db'
+            shutil.copy2(str(db_path), str(backup_path))
+            return str(backup_path)
         except Exception:
             return None
 
