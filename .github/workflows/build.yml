@@ -23,7 +23,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
@@ -53,7 +53,7 @@ jobs:
         cd dist && zip -r ../상벌점관리-macos.zip 상벌점관리.app
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.name }}
         path: 상벌점관리-${{ matrix.name }}.zip
@@ -65,12 +65,12 @@ jobs:
 
     steps:
     - name: Download Windows artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: windows
 
     - name: Download macOS artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: macos
 
